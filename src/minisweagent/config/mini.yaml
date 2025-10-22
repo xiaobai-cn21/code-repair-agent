@@ -6,6 +6,17 @@ agent:
     Include a THOUGHT section before your command where you explain your reasoning process.
     Format your response as shown in <format_example>.
 
+    ## Initialization: Ensure Agent Directories Exist
+
+    Before doing any other action, the agent should create the following folders in the root if they don't exist:
+
+    - `agent-test` → for storing all test scripts created during debugging.
+    - `backup-agent` → for storing backup copies of files before modifying them.
+
+    ```bash
+    mkdir -p agent-test backup-agent
+    ```
+
     ## Special Handling for Python Packages
 
     If you detect a Python project (there is a `setup.py` or `pyproject.toml` in the root directory), always install the project in editable mode first to ensure that any local changes are reflected during testing or execution:
@@ -14,7 +25,15 @@ agent:
     pip install -e .
     ```
 
-    
+    ## Backing up Files
+
+    When backing up any file before modifying it, **keep the same filename and extension** in the `backup-agent` folder.  
+    For example, if the file is `main.py`, the backup should be `backup-agent/main.py` and **not** `main.py.backup`.  
+    Use the following pattern:
+
+    ```bash
+    cp /path/to/original/file backup-agent/$(basename /path/to/original/file)
+    ```
 
     <format_example>
     Your reasoning and analysis here. Explain why you want to perform the action.
@@ -24,8 +43,6 @@ agent:
     ```
     </format_example>
 
-    Failure to follow these rules will cause your response to be rejected.
-
   instance_template: |
     Please solve this issue: {{task}}
 
@@ -34,20 +51,15 @@ agent:
     ## Recommended Workflow
 
     1. Analyze the codebase by finding and reading relevant files
-    2. If this is a Python package, first run `pip install -e .`
-    3. Create a script to reproduce the issue
-    4. Edit the source code to resolve the issue
-    5. Verify your fix works by running your script again
-    6. Test edge cases to ensure your fix is robust
-    7. Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
+    2. Ensure the directories `agent-test` and `backup-agent` exist
+    3. If this is a Python package, first run `pip install -e .`
+    4. Create a script to reproduce the issue (store in `agent-test`)
+    5. Backup any files before modifying them and keep the same file extension (copy to `backup-agent`)
+    6. Edit the source code to resolve the issue
+    7. Verify your fix works by running your script again
+    8. Test edge cases to ensure your fix is robust
+    9. Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
        Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
-
-    ## Important Rules
-
-    1. Every response must contain exactly one action
-    2. The action must be enclosed in triple backticks
-    3. Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
-       However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
 
   action_observation_template: |
     <returncode>{{output.returncode}}</returncode>
@@ -59,15 +71,11 @@ agent:
     <warning>
     The output of your last command was too long.
     Please try a different command that produces less output.
-    If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
-    If you really need to see something from the full command's output, you can redirect output to a file and search in that file.
+    If you're looking at a file you can try head, tail or sed to view a smaller number of lines selectively.
     </warning>
-    {%- set elided_chars = output.output | length - 10000 -%}
-    <output_head>
-    {{ output.output[:5000] }}
-    </output_head>
+    {% set elided_chars = output.output | length - 10000 %}
     <elided_chars>
-    {{ elided_chars }} characters elided
+    {{ elided_chars }}
     </elided_chars>
     <output_tail>
     {{ output.output[-5000:] }}
